@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Architecture — ThermalSR</title>
+<link rel="stylesheet" href="css/global.css"/>
+<style>
+.page-wrap { max-width: 1320px; margin: 0 auto; padding: 60px 48px 100px; position: relative; z-index: 1; }
+
+/* ─ PIPELINE DIAGRAM ─ */
+.arch-diagram {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 16px; padding: 48px; margin: 40px 0;
+  position: relative; overflow-x: auto;
+}
+
+.arch-flow {
+  display: flex; align-items: stretch; gap: 0;
+  min-width: 900px;
+}
+
+.arch-col { display: flex; flex-direction: column; align-items: center; gap: 0; flex: 1; }
+
+.arch-box {
+  padding: 18px 14px; border-radius: 10px;
+  border: 1px solid var(--border2); text-align: center;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  cursor: default; width: 100%;
+  position: relative;
+}
+.arch-box:hover { border-color: var(--accent); box-shadow: 0 0 16px rgba(0,200,240,0.15); }
+
+.arch-box.optical { border-color: rgba(0,200,240,0.3); background: rgba(0,200,240,0.04); }
+.arch-box.thermal { border-color: rgba(255,87,34,0.3);  background: rgba(255,87,34,0.04); }
+.arch-box.fusion  { border-color: rgba(118,255,3,0.3);  background: rgba(118,255,3,0.04); }
+.arch-box.output  { border-color: rgba(255,193,7,0.3);  background: rgba(255,193,7,0.04); }
+.arch-box.physics { border-color: rgba(200,160,255,0.3);background: rgba(200,160,255,0.04);}
+
+.arch-box-label { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); letter-spacing: 1.5px; margin-bottom: 6px; }
+.arch-box-name  { font-family: var(--ff-head); font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.arch-box-sub   { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); line-height: 1.5; }
+
+.arch-arrow {
+  display: flex; align-items: center; padding: 0 12px; color: var(--muted);
+  font-size: 18px; flex-shrink: 0; align-self: center;
+}
+
+.arch-stack { display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.arch-bridge {
+  height: 40px; display: flex; align-items: center; justify-content: center;
+  font-family: var(--ff-mono); font-size: 9px; color: var(--muted); gap: 6px;
+}
+
+/* ─ SECTION TABS ─ */
+.tab-bar {
+  display: flex; gap: 4px; border-bottom: 1px solid var(--border2);
+  margin-bottom: 40px;
+}
+.tab {
+  padding: 12px 20px; font-family: var(--ff-mono); font-size: 10px;
+  color: var(--muted); letter-spacing: 1.5px; cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color 0.2s, border-color 0.2s;
+  text-transform: uppercase;
+}
+.tab:hover  { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ─ MODULE CARDS ─ */
+.module-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+
+.module-card {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); overflow: hidden;
+}
+
+.module-head {
+  padding: 16px 20px; border-bottom: 1px solid var(--border2);
+  display: flex; align-items: center; gap: 12px;
+}
+.module-num { font-family: var(--ff-head); font-size: 11px; color: var(--accent); font-weight: 700; }
+.module-title { font-family: var(--ff-head); font-size: 15px; font-weight: 700; color: #fff; }
+.module-body { padding: 20px; }
+.module-desc { font-size: 13px; color: var(--muted); line-height: 1.8; margin-bottom: 16px; }
+
+.param-table { width: 100%; border-collapse: collapse; }
+.param-table td {
+  padding: 7px 10px; font-family: var(--ff-mono); font-size: 10px;
+  border-bottom: 1px solid var(--border2);
+}
+.param-table td:first-child { color: var(--muted); }
+.param-table td:last-child  { color: var(--text); text-align: right; }
+.param-table tr:last-child td { border-bottom: none; }
+
+/* ─ LOSS FUNCTIONS ─ */
+.loss-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+.loss-card {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); padding: 24px;
+}
+.loss-sym {
+  font-family: var(--ff-mono); font-size: 22px; font-weight: 700;
+  margin-bottom: 12px;
+}
+.loss-name  { font-family: var(--ff-head); font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.loss-desc  { font-size: 12px; color: var(--muted); line-height: 1.7; }
+.loss-eq    { font-family: var(--ff-mono); font-size: 11px; color: var(--dim); margin-top: 10px; padding: 8px 12px; background: var(--bg1); border-radius: 6px; }
+
+/* ─ METRICS TABLE ─ */
+.metrics-explain {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); overflow: hidden;
+}
+.metrics-table { width: 100%; border-collapse: collapse; }
+.metrics-table th {
+  padding: 14px 20px; font-family: var(--ff-mono); font-size: 9px;
+  font-weight: 700; color: var(--muted); letter-spacing: 1.5px;
+  text-align: left; background: var(--bg1);
+  border-bottom: 1px solid var(--border2);
+}
+.metrics-table td {
+  padding: 14px 20px; font-size: 13px;
+  border-bottom: 1px solid var(--border2);
+}
+.metrics-table tr:last-child td { border-bottom: none; }
+.metrics-table tr:hover td { background: var(--bg3); }
+
+.meter { height: 4px; border-radius: 2px; overflow: hidden; background: var(--dim); margin-top: 6px; }
+.meter-fill { height: 100%; border-radius: 2px; }
+
+/* ─ MATLAB TRANSLATION ─ */
+.matlab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+.code-block {
+  background: var(--bg1); border: 1px solid var(--border2);
+  border-radius: var(--r); overflow: hidden;
+}
+.code-head {
+  padding: 10px 16px; background: var(--bg2);
+  border-bottom: 1px solid var(--border2);
+  font-family: var(--ff-mono); font-size: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.code-head .dot { width: 8px; height: 8px; border-radius: 50%; }
+.code-body { padding: 16px; overflow-x: auto; }
+pre { font-family: var(--ff-mono); font-size: 11px; line-height: 1.7; white-space: pre; }
+.cm { color: #4a7a9b; }   /* comment */
+.ck { color: #c792ea; }   /* keyword */
+.cs { color: var(--accent2); }  /* string/fn */
+.cv { color: var(--accent); }   /* variable */
+.cn { color: var(--accent3); }  /* number */
+
+@media (max-width: 900px) {
+  .page-wrap { padding: 32px 20px 80px; }
+  .module-grid { grid-template-columns: 1fr; }
+  .loss-grid   { grid-template-columns: 1fr; }
+  .matlab-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+
+<nav>
+  <a href="index.html" class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="6" stroke="#00c8f0" stroke-width="1.2"/>
+        <circle cx="8" cy="8" r="2.5" fill="#00c8f0" opacity="0.7"/>
+      </svg>
+    </div>
+    <div class="nav-logo-text">THERMALSR</div>
+  </a>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="process.html">Process</a>
+    <a href="architecture.html" class="active">Architecture</a>
+    <a href="history.html">History</a>
+  </div>
+  <span class="nav-badge">MULTI IMAGE PROCESSING SYSTEM</span>
+</nav>
+
+<div class="page-wrap">
+  <div style="margin-bottom:48px;">
+    <span class="sec-label">System Design</span>
+    <h1 class="sec-title">Pipeline <span>Architecture</span></h1>
+    <p class="sec-desc" style="margin-top:12px;">
+      Complete technical breakdown of the optical-guided thermal super-resolution pipeline — from sensor inputs to high-resolution output.
+    </p>
+  </div>
+
+  <!-- PIPELINE DIAGRAM -->
+  <div class="arch-diagram">
+    <div style="font-family:var(--ff-mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:32px;">FULL PIPELINE · DATA FLOW</div>
+    <div class="arch-flow">
+
+      <!-- INPUT COL -->
+      <div class="arch-stack">
+        <div class="arch-box optical">
+          <div class="arch-box-label">SENSOR A</div>
+          <div class="arch-box-name">Optical</div>
+          <div class="arch-box-sub">1–5 m<br/>RGB / NIR</div>
+        </div>
+        <div class="arch-bridge">↕ input</div>
+        <div class="arch-box thermal">
+          <div class="arch-box-label">SENSOR B</div>
+          <div class="arch-box-name">Thermal IR</div>
+          <div class="arch-box-sub">5–10 m<br/>TIR band</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">→</div>
+
+      <!-- PREPROC -->
+      <div class="arch-stack">
+        <div class="arch-box optical">
+          <div class="arch-box-label">STEP 01A</div>
+          <div class="arch-box-name">Opt. Preprocess</div>
+          <div class="arch-box-sub">CLAHE<br/>Resize</div>
+        </div>
+        <div class="arch-bridge">↕ align</div>
+        <div class="arch-box thermal">
+          <div class="arch-box-label">STEP 01B</div>
+          <div class="arch-box-name">TIR Preprocess</div>
+          <div class="arch-box-sub">Median filter<br/>Grayscale</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">→</div>
+
+      <!-- CO-REG -->
+      <div class="arch-col">
+        <div class="arch-box" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;">
+          <div class="arch-box-label">STEP 02</div>
+          <div class="arch-box-name">Co-Registration</div>
+          <div class="arch-box-sub">LoFTR keypoints<br/>RANSAC homography<br/>Subpixel warp</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">→</div>
+
+      <!-- ENCODERS -->
+      <div class="arch-stack">
+        <div class="arch-box optical">
+          <div class="arch-box-label">STEP 03A</div>
+          <div class="arch-box-name">Optical Encoder</div>
+          <div class="arch-box-sub">Edge + texture<br/>FPN features</div>
+        </div>
+        <div class="arch-bridge">↕ cross-attn</div>
+        <div class="arch-box thermal">
+          <div class="arch-box-label">STEP 03B</div>
+          <div class="arch-box-name">Thermal Encoder</div>
+          <div class="arch-box-sub">Temp embeddings<br/>Physics space</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">→</div>
+
+      <!-- FUSION -->
+      <div class="arch-col">
+        <div class="arch-box fusion" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;">
+          <div class="arch-box-label">STEP 04 · CORE</div>
+          <div class="arch-box-name">Guided SR</div>
+          <div class="arch-box-sub">Cross-modal attention<br/>Physics decoder<br/>Pixel-shuffle ×4</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">→</div>
+
+      <!-- OUTPUT -->
+      <div class="arch-col">
+        <div class="arch-box output" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;">
+          <div class="arch-box-label">OUTPUT</div>
+          <div class="arch-box-name">HR Thermal Map</div>
+          <div class="arch-box-sub">Spatially sharp<br/>Thermally faithful<br/>PSNR / SSIM / RMSE</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Physics branch annotation -->
+    <div style="margin-top:24px;padding-top:20px;border-top:1px dashed var(--border2);
+      font-family:var(--ff-mono);font-size:10px;color:var(--muted);display:flex;gap:32px;flex-wrap:wrap;">
+      <span style="color:rgba(200,160,255,0.8)">⊕ Physics priors:</span>
+      <span>Emissivity correction (per-pixel from NDVI/NDWI)</span>
+      <span>·</span>
+      <span>Radiative transfer consistency loss</span>
+      <span>·</span>
+      <span>Surface energy balance constraint</span>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tab-bar">
+    <div class="tab active" onclick="showTab('modules',this)">Network Modules</div>
+    <div class="tab" onclick="showTab('losses',this)">Loss Functions</div>
+    <div class="tab" onclick="showTab('metrics',this)">Evaluation Metrics</div>
+    <div class="tab" onclick="showTab('matlab',this)">MATLAB → Python</div>
+  </div>
+
+  <!-- TAB: MODULES -->
+  <div class="tab-panel active" id="tab-modules">
+    <div class="module-grid">
+      <div class="module-card">
+        <div class="module-head">
+          <span class="module-num">01</span>
+          <span class="module-title">Multi-Sensor Co-Registration</span>
+        </div>
+        <div class="module-body">
+          <p class="module-desc">
+            Uses LoFTR (detector-free local feature matching) to extract cross-modal keypoint correspondences between optical and TIR images. RANSAC estimates a robust homography; thin-plate spline warp handles non-rigid distortion. A per-pixel alignment confidence map flags low-confidence regions (water, bare soil) for suppressed guidance.
+          </p>
+          <table class="param-table">
+            <tr><td>Method</td><td>LoFTR + RANSAC homography</td></tr>
+            <tr><td>Warp type</td><td>Homography / thin-plate spline</td></tr>
+            <tr><td>Output</td><td>Aligned TIR + confidence map</td></tr>
+            <tr><td>Accuracy target</td><td>&lt; 0.5 pixel RMSE</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="module-card">
+        <div class="module-head">
+          <span class="module-num">02</span>
+          <span class="module-title">Dual-Stream Encoder</span>
+        </div>
+        <div class="module-body">
+          <p class="module-desc">
+            Two separate Swin Transformer backbones process optical and thermal streams independently, preserving their native representation spaces. The optical encoder extracts a 4-level FPN pyramid of edge/texture features. The thermal encoder operates in calibrated Kelvin units, not normalized pixels.
+          </p>
+          <table class="param-table">
+            <tr><td>Backbone</td><td>Swin Transformer-S</td></tr>
+            <tr><td>Feature levels</td><td>4 (P2–P5)</td></tr>
+            <tr><td>Optical output</td><td>Structural feature maps</td></tr>
+            <tr><td>Thermal input</td><td>Calibrated Kelvin values</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="module-card">
+        <div class="module-head">
+          <span class="module-num">03</span>
+          <span class="module-title">Cross-Modal Attention Fusion</span>
+        </div>
+        <div class="module-body">
+          <p class="module-desc">
+            Thermal features act as queries attending to optical keys/values. A guidance gate (scalar per spatial location) suppresses optical guidance where alignment confidence is low or where no temperature boundary should exist (glass rooftops, water bodies). Prevents optical texture bleed.
+          </p>
+          <table class="param-table">
+            <tr><td>Mechanism</td><td>Multi-head cross-attention</td></tr>
+            <tr><td>Heads</td><td>8</td></tr>
+            <tr><td>Guidance gate</td><td>Per-pixel sigmoid scalar</td></tr>
+            <tr><td>Anti-artifact</td><td>Confidence-weighted masking</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="module-card">
+        <div class="module-head">
+          <span class="module-num">04</span>
+          <span class="module-title">Physics-Constrained Decoder</span>
+        </div>
+        <div class="module-body">
+          <p class="module-desc">
+            An auxiliary branch estimates per-pixel emissivity from land cover class (NDVI, NDWI indices from optical). The decoder applies emissivity correction before pixel-shuffle upsampling. A differentiable energy-balance loss penalizes outputs that violate surface energy balance.
+          </p>
+          <table class="param-table">
+            <tr><td>Upsampling</td><td>Pixel-shuffle (sub-pixel conv)</td></tr>
+            <tr><td>Scale factor</td><td>×4 (configurable)</td></tr>
+            <tr><td>Emissivity src</td><td>NDVI/NDWI from optical</td></tr>
+            <tr><td>Physics model</td><td>Simplified SEB (simplified energy balance)</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: LOSSES -->
+  <div class="tab-panel" id="tab-losses">
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:24px;margin-bottom:24px;">
+      <div style="font-family:var(--ff-mono);font-size:12px;color:var(--text);line-height:2;">
+        L<sub>total</sub> = λ₁ · L<sub>pixel</sub> &nbsp;+&nbsp; λ₂ · L<sub>perceptual</sub> &nbsp;+&nbsp; λ₃ · L<sub>physics</sub> &nbsp;+&nbsp; λ₄ · L<sub>edge</sub>
+      </div>
+      <div style="font-family:var(--ff-mono);font-size:10px;color:var(--muted);margin-top:8px;">
+        λ₁=1.0 &nbsp;·&nbsp; λ₂=0.1 &nbsp;·&nbsp; λ₃=0.05 &nbsp;·&nbsp; λ₄=0.2
+      </div>
+    </div>
+    <div class="loss-grid">
+      <div class="loss-card">
+        <div class="loss-sym" style="color:var(--accent);">L<sub>pixel</sub></div>
+        <div class="loss-name">Pixel / Temperature Loss</div>
+        <div class="loss-desc">Mean absolute error in Kelvin between SR output and HR reference thermal. Directly enforces temperature fidelity — the core constraint for physical correctness.</div>
+        <div class="loss-eq">MAE(SR, HR) = mean(|SR - HR|)</div>
+      </div>
+      <div class="loss-card">
+        <div class="loss-sym" style="color:var(--accent2);">L<sub>perceptual</sub></div>
+        <div class="loss-name">Perceptual Feature Loss</div>
+        <div class="loss-desc">VGG-16 feature-space L2 loss between SR and HR at layers conv3_3 and conv4_3. Sharpens spatial structure without hallucinating per-pixel values.</div>
+        <div class="loss-eq">||φ(SR) - φ(HR)||²  (VGG features)</div>
+      </div>
+      <div class="loss-card">
+        <div class="loss-sym" style="color:rgba(200,160,255,1);">L<sub>physics</sub></div>
+        <div class="loss-name">Physics Consistency Loss</div>
+        <div class="loss-desc">Penalizes outputs where the estimated radiative flux (from SR temperature and emissivity) violates the Stefan-Boltzmann law and energy balance. Ensures physical plausibility.</div>
+        <div class="loss-eq">||ε·σ·T⁴_SR - L_measured||²</div>
+      </div>
+      <div class="loss-card">
+        <div class="loss-sym" style="color:var(--accent3);">L<sub>edge</sub></div>
+        <div class="loss-name">Edge Alignment Loss</div>
+        <div class="loss-desc">Chamfer distance between SR thermal edges and optically guided boundary map. Encourages sharpness at real thermal boundaries; suppresses false edges from optical leakage.</div>
+        <div class="loss-eq">ChamferDist(edges(SR), guided_edges)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: METRICS -->
+  <div class="tab-panel" id="tab-metrics">
+    <div class="metrics-explain">
+      <table class="metrics-table">
+        <thead>
+          <tr>
+            <th>Metric</th><th>Full Name</th><th>Formula</th>
+            <th>Excellent</th><th>Acceptable</th><th>Poor</th><th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag tag-cyan">PSNR</span></td>
+            <td style="font-family:var(--ff-body)">Peak Signal-to-Noise Ratio</td>
+            <td style="font-family:var(--ff-mono);font-size:11px;">10·log₁₀(MAX²/MSE)</td>
+            <td style="color:var(--accent3)">&gt; 30 dB</td>
+            <td style="color:var(--gold)">20–30 dB</td>
+            <td style="color:var(--accent2)">&lt; 20 dB</td>
+            <td style="color:var(--muted);font-size:12px;">Higher = less noise vs signal. Standard but ignores perceptual quality.</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-orange">SSIM</span></td>
+            <td style="font-family:var(--ff-body)">Structural Similarity Index</td>
+            <td style="font-family:var(--ff-mono);font-size:11px;">(2μ₁μ₂+C₁)(2σ₁₂+C₂)/...</td>
+            <td style="color:var(--accent3)">&gt; 0.85</td>
+            <td style="color:var(--gold)">0.65–0.85</td>
+            <td style="color:var(--accent2)">&lt; 0.65</td>
+            <td style="color:var(--muted);font-size:12px;">Measures luminance, contrast, structure similarity. Perceptually meaningful (0–1).</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-green">RMSE</span></td>
+            <td style="font-family:var(--ff-body)">Root Mean Square Error</td>
+            <td style="font-family:var(--ff-mono);font-size:11px;">√(mean((SR-HR)²))</td>
+            <td style="color:var(--accent3)">&lt; 0.05</td>
+            <td style="color:var(--gold)">0.05–0.15</td>
+            <td style="color:var(--accent2)">&gt; 0.15</td>
+            <td style="color:var(--muted);font-size:12px;">Average pixel deviation. In Kelvin: multiply by temperature range (e.g. ×30K → ΔT in K).</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-gold">EAS</span></td>
+            <td style="font-family:var(--ff-body)">Edge Alignment Score</td>
+            <td style="font-family:var(--ff-mono);font-size:11px;">ChamferDist(E_SR, E_opt)</td>
+            <td style="color:var(--accent3)">&lt; 1.5 px</td>
+            <td style="color:var(--gold)">1.5–4 px</td>
+            <td style="color:var(--accent2)">&gt; 4 px</td>
+            <td style="color:var(--muted);font-size:12px;">Domain-specific: checks SR edges align with optically-guided thermal boundaries. Catches texture bleed.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB: MATLAB -->
+  <div class="tab-panel" id="tab-matlab">
+    <p style="color:var(--muted);font-size:13px;margin-bottom:24px;line-height:1.8;">
+      Your MATLAB script is translated step-by-step to Python (called via MATLAB Engine API for Python). This lets the FastAPI server invoke your actual MATLAB code while serving a web frontend.
+    </p>
+    <div class="matlab-grid">
+      <div class="code-block">
+        <div class="code-head">
+          <div class="dot" style="background:#ff5f57"></div>
+          <div class="dot" style="background:#ffbd2e"></div>
+          <div class="dot" style="background:#28ca41"></div>
+          <span style="margin-left:8px;">MATLAB (your script)</span>
+        </div>
+        <div class="code-body">
+<pre><span class="cm">% Noise reduction</span>
+<span class="cv">gray</span> = <span class="cs">medfilt2</span>(gray,[<span class="cn">5 5</span>]);
+
+<span class="cm">% Contrast enhance</span>
+<span class="cv">gray</span> = <span class="cs">adapthisteq</span>(gray, ...
+  <span class="ck">'ClipLimit'</span>,<span class="cn">0.02</span>);
+
+<span class="cm">% Low-res sim</span>
+<span class="cv">low_res</span> = <span class="cs">imresize</span>(gray,<span class="cn">0.4</span>,<span class="ck">'bicubic'</span>);
+<span class="cv">low_res_up</span> = <span class="cs">imresize</span>(low_res,<span class="cs">size</span>(gray));
+
+<span class="cm">% Detail extraction</span>
+<span class="cv">blur1</span> = <span class="cs">imgaussfilt</span>(low_res_up,<span class="cn">1</span>);
+<span class="cv">blur2</span> = <span class="cs">imgaussfilt</span>(low_res_up,<span class="cn">2</span>);
+<span class="cv">detail</span> = (low_res_up - blur1) + (blur1 - blur2);
+
+<span class="cm">% Canny edges</span>
+<span class="cv">edges</span> = <span class="cs">edge</span>(gray,<span class="ck">'canny'</span>);
+<span class="cv">edges</span> = <span class="cs">im2double</span>(edges) * <span class="cs">mean</span>(gray(:)) * <span class="cn">1.5</span>;
+
+<span class="cm">% SR fusion</span>
+<span class="cv">SR</span> = low_res_up + <span class="cn">0.6</span>*edges + <span class="cn">0.4</span>*detail;
+<span class="cv">SR</span> = <span class="cs">mat2gray</span>(SR);
+<span class="cv">SR</span> = <span class="cs">imsharpen</span>(SR,<span class="ck">'Radius'</span>,<span class="cn">2</span>,<span class="ck">'Amount'</span>,<span class="cn">1.8</span>);
+
+<span class="cm">% Metrics</span>
+<span class="cv">psnr_val</span> = <span class="cs">psnr</span>(SR, gray);
+<span class="cv">ssim_val</span> = <span class="cs">ssim</span>(SR, gray);</pre>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-head">
+          <div class="dot" style="background:#ff5f57"></div>
+          <div class="dot" style="background:#ffbd2e"></div>
+          <div class="dot" style="background:#28ca41"></div>
+          <span style="margin-left:8px;">Python — MATLAB Engine API</span>
+        </div>
+        <div class="code-body">
+<pre><span class="ck">import</span> matlab.engine
+<span class="cv">eng</span> = matlab.engine.<span class="cs">start_matlab</span>()
+
+<span class="cm"># Pass image as MATLAB array</span>
+<span class="cv">mat_img</span> = matlab.double(gray.tolist())
+
+<span class="cm"># Call MATLAB functions directly</span>
+<span class="cv">gray_m</span> = eng.<span class="cs">medfilt2</span>(mat_img,
+           matlab.double([[<span class="cn">5</span>,<span class="cn">5</span>]]))
+
+<span class="cv">gray_m</span> = eng.<span class="cs">adapthisteq</span>(gray_m,
+           <span class="ck">'ClipLimit'</span>, <span class="cn">0.02</span>)
+
+<span class="cv">low_res</span> = eng.<span class="cs">imresize</span>(gray_m, <span class="cn">0.4</span>,
+           <span class="ck">'bicubic'</span>)
+
+<span class="cv">blur1</span> = eng.<span class="cs">imgaussfilt</span>(low_res_up, <span class="cn">1.0</span>)
+<span class="cv">blur2</span> = eng.<span class="cs">imgaussfilt</span>(low_res_up, <span class="cn">2.0</span>)
+
+<span class="cm"># SR (same formula)</span>
+<span class="cv">SR</span> = eng.<span class="cs">imsharpen</span>(SR_fused,
+       <span class="ck">'Radius'</span>,<span class="cn">2</span>,<span class="ck">'Amount'</span>,<span class="cn">1.8</span>)
+
+<span class="cm"># Metrics via MATLAB</span>
+<span class="cv">psnr_val</span> = eng.<span class="cs">psnr</span>(SR, gray_m)
+<span class="cv">ssim_val</span> = eng.<span class="cs">ssim</span>(SR, gray_m)
+
+eng.<span class="cs">quit</span>()</pre>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:20px;background:var(--bg2);border:1px solid rgba(255,193,7,0.2);border-radius:var(--r);padding:20px;font-family:var(--ff-mono);font-size:11px;color:var(--muted);line-height:1.8;">
+      <span style="color:var(--gold)">⚠ Requirement:</span> MATLAB R2021b+ must be installed. Install the Python engine with:<br/>
+      <span style="color:var(--text)">cd "matlabroot/extern/engines/python" &amp;&amp; python setup.py install</span><br/>
+      Then install matlabengine: <span style="color:var(--text)">pip install matlabengine</span>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span>ThermalSR · Architecture</span>
+  <span>Swin Transformer · LoFTR · Pixel-Shuffle · Physics Priors</span>
+</footer>
+
+<script>
+function showTab(id, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  el.classList.add('active');
+}
+</script>
+</body>
+</html>

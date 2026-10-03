@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ThermalSR — Optical-Guided Super Resolution</title>
+<link rel="stylesheet" href="css/global.css"/>
+<style>
+/* ── HERO ── */
+.hero {
+  min-height: calc(100vh - 64px);
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 80px 48px;
+  position: relative; z-index: 1;
+  max-width: 1320px; margin: 0 auto;
+}
+
+.hero-eyebrow {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 32px;
+}
+
+.hero-line { height: 1px; width: 48px; background: var(--accent); }
+
+.hero-eyebrow span {
+  font-family: var(--ff-mono); font-size: 10px; color: var(--accent);
+  letter-spacing: 3px; text-transform: uppercase;
+}
+
+.hero-title {
+  font-family: var(--ff-head);
+  font-size: clamp(42px, 7vw, 96px);
+  font-weight: 800; line-height: 0.95;
+  color: #fff; margin-bottom: 32px;
+  max-width: 900px;
+}
+
+.hero-title .t1 { display: block; }
+.hero-title .t2 { display: block; color: var(--accent); -webkit-text-stroke: 1px var(--accent); }
+.hero-title .t3 { display: block; color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.25); }
+
+.hero-sub {
+  font-size: 16px; color: var(--muted); max-width: 560px;
+  line-height: 1.8; margin-bottom: 48px;
+}
+
+.hero-cta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 80px; }
+
+/* ── STATS ROW ── */
+.stats-row {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--border2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r); overflow: hidden;
+  max-width: 760px;
+}
+
+.stat-cell {
+  padding: 20px 24px; background: var(--bg1);
+  transition: background 0.2s;
+}
+.stat-cell:hover { background: var(--bg2); }
+
+.stat-val {
+  font-family: var(--ff-head); font-size: 28px; font-weight: 800;
+  line-height: 1; margin-bottom: 4px;
+}
+
+.stat-label { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+
+/* ── FLOATING HEATMAP ── */
+.hero-visual {
+  position: absolute; right: 48px; top: 50%; transform: translateY(-50%);
+  width: 380px; height: 380px;
+  pointer-events: none;
+}
+
+.hmap-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1px solid var(--border);
+  animation: rotate-ring 20s linear infinite;
+}
+.hmap-ring:nth-child(2) { inset: 30px; border-color: rgba(255,87,34,0.15); animation-direction: reverse; animation-duration: 15s; }
+.hmap-ring:nth-child(3) { inset: 60px; border-color: rgba(0,200,240,0.2); animation-duration: 25s; }
+
+@keyframes rotate-ring { to { transform: rotate(360deg); } }
+
+.hmap-core {
+  position: absolute; inset: 80px; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255,87,34,0.3) 0%, rgba(255,193,7,0.15) 40%, rgba(0,200,240,0.05) 80%, transparent 100%);
+  animation: pulse-core 4s ease-in-out infinite;
+}
+
+@keyframes pulse-core {
+  0%,100% { transform: scale(1); opacity: 0.6; }
+  50%      { transform: scale(1.1); opacity: 1; }
+}
+
+.hmap-label {
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  font-family: var(--ff-mono); font-size: 9px; color: var(--muted);
+  letter-spacing: 2px; white-space: nowrap;
+}
+
+/* ── FEATURES ── */
+.features-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  background: var(--border2);
+  border: 1px solid var(--border2); border-radius: var(--r);
+  overflow: hidden;
+}
+
+.feat {
+  padding: 40px 32px; background: var(--bg1);
+  transition: background 0.3s;
+  position: relative; overflow: hidden;
+}
+.feat::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 0.4s;
+}
+.feat:hover { background: var(--bg2); }
+.feat:hover::before { transform: scaleX(1); }
+.feat:nth-child(1)::before { background: var(--accent); }
+.feat:nth-child(2)::before { background: var(--accent2); }
+.feat:nth-child(3)::before { background: var(--accent3); }
+.feat:nth-child(4)::before { background: var(--gold); }
+.feat:nth-child(5)::before { background: var(--accent); }
+.feat:nth-child(6)::before { background: var(--accent2); }
+
+.feat-num {
+  font-family: var(--ff-head); font-size: 48px; font-weight: 800;
+  color: var(--border); line-height: 1; margin-bottom: 16px;
+  transition: color 0.3s;
+}
+.feat:hover .feat-num { color: var(--border2); }
+
+.feat-icon { font-size: 24px; margin-bottom: 16px; }
+.feat-title {
+  font-family: var(--ff-head); font-size: 16px; font-weight: 700;
+  color: #fff; margin-bottom: 10px;
+}
+.feat-desc { font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+/* ── HOW IT WORKS ── */
+.how-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+
+.steps-list { display: flex; flex-direction: column; gap: 0; }
+
+.step-item {
+  display: flex; gap: 24px; padding: 28px 0;
+  border-bottom: 1px solid var(--border2);
+  position: relative;
+  transition: background 0.2s;
+}
+.step-item:first-child { border-top: 1px solid var(--border2); }
+
+.step-num-big {
+  font-family: var(--ff-head); font-size: 11px; font-weight: 700;
+  color: var(--accent); letter-spacing: 2px; min-width: 28px;
+  padding-top: 3px;
+}
+
+.step-content {}
+.step-title { font-family: var(--ff-head); font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.step-text  { font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+.pipeline-visual {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); padding: 32px; position: relative;
+}
+
+.pipe-flow { display: flex; flex-direction: column; gap: 0; }
+
+.pipe-block {
+  padding: 16px 20px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: border-color 0.3s;
+  position: relative;
+}
+.pipe-block:hover { border-color: var(--accent); }
+
+.pipe-block-label { font-family: var(--ff-mono); font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-bottom: 4px; }
+.pipe-block-name  { font-family: var(--ff-head); font-size: 13px; font-weight: 700; color: var(--text); }
+
+.pipe-arrow {
+  width: 1px; height: 16px; background: var(--border);
+  margin: 0 auto 8px; position: relative;
+}
+.pipe-arrow::after {
+  content: '▼'; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+  font-size: 8px; color: var(--muted);
+}
+
+.pipe-block.active-pipe { border-color: var(--accent2); background: rgba(255,87,34,0.04); }
+.pipe-block.active-pipe .pipe-block-name { color: var(--accent2); }
+
+/* ── APPLICATIONS ── */
+.apps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+.app-card {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); padding: 32px;
+  transition: border-color 0.3s, transform 0.3s;
+}
+.app-card:hover { border-color: var(--border); transform: translateY(-4px); }
+
+.app-icon { font-size: 32px; margin-bottom: 20px; }
+.app-title { font-family: var(--ff-head); font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+.app-desc  { font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+/* ── TECH STACK ── */
+.tech-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+
+.tech-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 6px;
+  background: var(--bg2); border: 1px solid var(--border2);
+  font-family: var(--ff-mono); font-size: 11px; color: var(--text);
+  letter-spacing: 0.5px;
+  transition: border-color 0.2s;
+}
+.tech-pill:hover { border-color: var(--accent); }
+.tech-pill span  { font-size: 14px; }
+
+/* ── CTA BANNER ── */
+.cta-banner {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 16px; padding: 64px;
+  display: flex; align-items: center; justify-content: space-between; gap: 40px;
+  flex-wrap: wrap; position: relative; overflow: hidden;
+}
+.cta-banner::before {
+  content: ''; position: absolute; top: -60px; right: -60px;
+  width: 300px; height: 300px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,200,240,0.08) 0%, transparent 70%);
+}
+.cta-text h2 { font-family: var(--ff-head); font-size: 32px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+.cta-text p  { color: var(--muted); font-size: 14px; }
+
+@media (max-width: 1100px) {
+  .hero-visual { display: none; }
+  .how-grid    { grid-template-columns: 1fr; }
+  .features-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 700px) {
+  .hero { padding: 48px 20px; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .features-grid { grid-template-columns: 1fr; }
+  .apps-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+
+<!-- NAV -->
+<nav>
+  <a href="index.html" class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="6" stroke="#00c8f0" stroke-width="1.2"/>
+        <circle cx="8" cy="8" r="2.5" fill="#00c8f0" opacity="0.7"/>
+      </svg>
+    </div>
+    <div class="nav-logo-text">THERMALSR</div>
+  </a>
+  <div class="nav-links">
+    <a href="index.html" class="active">Home</a>
+    <a href="process.html">Process</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="history.html">History</a>
+  </div>
+  <span class="nav-badge">MULTI IMAGE PROCESSING SYSTEM</span>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <!-- Floating visual -->
+  <div class="hero-visual">
+    <div class="hmap-ring"></div>
+    <div class="hmap-ring"></div>
+    <div class="hmap-ring"></div>
+    <div class="hmap-core"></div>
+    <span class="hmap-label">THERMAL IR · SUPER RESOLUTION</span>
+  </div>
+
+  <div class="hero-eyebrow fade-up">
+    <div class="hero-line"></div>
+    <span>Multi Image Processing System</span>
+  </div>
+
+  <h1 class="hero-title fade-up" style="animation-delay:0.1s">
+    <span class="t1">Optical-Guided</span>
+    <span class="t2">Thermal IR</span>
+    <span class="t3">Super-Resolution</span>
+  </h1>
+
+  <p class="hero-sub fade-up" style="animation-delay:0.2s">
+    A deep learning pipeline that fuses high-resolution optical imagery with low-resolution thermal IR data to produce spatially sharp, thermally faithful satellite maps.
+  </p>
+
+  <div class="hero-cta fade-up" style="animation-delay:0.3s">
+    <a href="process.html" class="btn btn-solid">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Run Pipeline
+    </a>
+    <a href="architecture.html" class="btn btn-cyan">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      View Architecture
+    </a>
+  </div>
+
+  <div class="stats-row fade-up" style="animation-delay:0.4s">
+    <div class="stat-cell">
+      <div class="stat-val" style="color:var(--accent)">4×</div>
+      <div class="stat-label">Spatial Upscale</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val" style="color:var(--accent2)">±0.5K</div>
+      <div class="stat-label">Temp Fidelity</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val" style="color:var(--accent3)">SSIM</div>
+      <div class="stat-label">Quality Metric</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val" style="color:var(--gold)">3</div>
+      <div class="stat-label">Applications</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- FEATURES -->
+<div class="section">
+  <span class="sec-label">Core Capabilities</span>
+  <h2 class="sec-title">What the pipeline <span>solves</span></h2>
+  <br/><br/>
+  <div class="features-grid">
+    <div class="feat">
+      <div class="feat-num">01</div>
+      <div class="feat-title">Multi-Sensor Alignment</div>
+      <div class="feat-desc">Geometrically co-registers high-resolution optical images with low-resolution TIR data using learned keypoint matching and subpixel homography estimation.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-num">02</div>
+      <div class="feat-title">Cross-Modal Fusion</div>
+      <div class="feat-desc">Cross-attention transformer fuses optical spatial features with thermal embeddings — selectively, preventing false texture transfer to thermally flat regions.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-num">03</div>
+      <div class="feat-title">Guided Super-Resolution</div>
+      <div class="feat-desc">Pixel-shuffle upsampling guided by optical edges. Sharp boundaries only where real temperature gradients exist — not optical artifacts.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-num">04</div>
+      <div class="feat-title">Physics Priors</div>
+      <div class="feat-desc">Emissivity correction, radiative transfer consistency, and surface energy balance constraints keep outputs physically meaningful.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-num">05</div>
+      <div class="feat-title">Quantitative Metrics</div>
+      <div class="feat-desc">Per-image PSNR, SSIM, and RMSE (Kelvin) computed instantly. Edge alignment score and temperature deviation across land-cover classes.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-num">06</div>
+      <div class="feat-title">Scalable Processing</div>
+      <div class="feat-desc">Tiled inference with halo padding handles full satellite swaths. TensorRT INT8 export for deployment on edge hardware.</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- HOW IT WORKS -->
+<div class="section">
+  <span class="sec-label">Pipeline Overview</span>
+  <h2 class="sec-title">How it <span>works</span></h2>
+  <br/><br/>
+  <div class="how-grid">
+    <div class="steps-list">
+      <div class="step-item">
+        <div class="step-num-big">01</div>
+        <div class="step-content">
+          <div class="step-title">Image Preprocessing</div>
+          <div class="step-text">Median filter removes sensor noise. Adaptive histogram equalization (CLAHE) enhances local contrast before any alignment is attempted.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num-big">02</div>
+        <div class="step-content">
+          <div class="step-title">Co-Registration</div>
+          <div class="step-text">SuperPoint/LoFTR extracts cross-modal feature correspondences. RANSAC-based homography warps TIR onto the optical grid with subpixel accuracy.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num-big">03</div>
+        <div class="step-content">
+          <div class="step-title">Feature Extraction</div>
+          <div class="step-text">Separate encoders process optical (edges, textures) and thermal (temperature embeddings) streams. Features are kept in their own representation spaces.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num-big">04</div>
+        <div class="step-content">
+          <div class="step-title">Guided SR + Decode</div>
+          <div class="step-text">Cross-attention fuses the streams. Physics-constrained decoder upsamples with emissivity correction. Output is a full-resolution thermal map.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num-big">05</div>
+        <div class="step-content">
+          <div class="step-title">Evaluation</div>
+          <div class="step-text">PSNR, SSIM, RMSE (K) measured against reference. Edge sharpness and alignment accuracy scored for qualitative assessment.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipeline-visual">
+      <div style="font-family:var(--ff-mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:20px;">PROCESSING PIPELINE</div>
+      <div class="pipe-flow">
+        <div class="pipe-block">
+          <div class="pipe-block-label">INPUT</div>
+          <div class="pipe-block-name">Optical (1–5m) + Thermal IR (5–10m)</div>
+        </div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-block">
+          <div class="pipe-block-label">STEP 01</div>
+          <div class="pipe-block-name">Preprocessing · Noise Reduction · CLAHE</div>
+        </div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-block">
+          <div class="pipe-block-label">STEP 02</div>
+          <div class="pipe-block-name">Multi-Sensor Co-Registration</div>
+        </div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-block">
+          <div class="pipe-block-label">STEP 03</div>
+          <div class="pipe-block-name">Dual-Stream Feature Encoding</div>
+        </div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-block active-pipe">
+          <div class="pipe-block-label">STEP 04 · CORE</div>
+          <div class="pipe-block-name">Guided Fusion Super-Resolution</div>
+        </div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-block" style="border-color:var(--accent3);background:rgba(118,255,3,0.03)">
+          <div class="pipe-block-label">OUTPUT</div>
+          <div class="pipe-block-name" style="color:var(--accent3)">High-Res Thermal Map · Metrics</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- APPLICATIONS -->
+<div class="section">
+  <span class="sec-label">Real-World Applications</span>
+  <h2 class="sec-title">Where it <em>matters</em></h2>
+  <br/><br/>
+  <div class="apps-grid">
+    <div class="app-card">
+      <div class="app-icon">🏙️</div>
+      <div class="app-title">Urban Heat Islands</div>
+      <div class="app-desc">High-resolution thermal maps reveal fine-scale temperature variation across buildings, roads, and green spaces — critical for urban planning and climate adaptation.</div>
+    </div>
+    <div class="app-card">
+      <div class="app-icon">🔥</div>
+      <div class="app-title">Wildfire Detection</div>
+      <div class="app-desc">Spatially precise hotspot maps enable early fire detection and perimeter tracking. Sub-pixel thermal boundaries distinguish flame fronts from warm background.</div>
+    </div>
+    <div class="app-card">
+      <div class="app-icon">🌾</div>
+      <div class="app-title">Precision Agriculture</div>
+      <div class="app-desc">Crop stress monitoring through canopy temperature. High-res thermal maps identify irrigation deficits and disease stress at field scale with ±0.5K accuracy.</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- TECH STACK -->
+<div class="section">
+  <span class="sec-label">Technology</span>
+  <h2 class="sec-title">Built with</h2>
+  <p class="sec-desc" style="margin-top:12px">The pipeline combines classical image processing (from your MATLAB script) with modern deep learning components.</p>
+  <div class="tech-row">
+    <div class="tech-pill"><span>🐍</span> Python 3.10</div>
+    <div class="tech-pill"><span>🔬</span> MATLAB Engine API</div>
+    <div class="tech-pill"><span>⚡</span> FastAPI</div>
+    <div class="tech-pill"><span>📷</span> OpenCV</div>
+    <div class="tech-pill"><span>🔢</span> NumPy / SciPy</div>
+    <div class="tech-pill"><span>🖼️</span> scikit-image</div>
+    <div class="tech-pill"><span>🔥</span> PyTorch (stub)</div>
+    <div class="tech-pill"><span>🌐</span> HTML5 / CSS3 / JS</div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- CTA -->
+<div class="section" style="padding-top:40px">
+  <div class="cta-banner">
+    <div class="cta-text">
+      <h2>Ready to process your imagery?</h2>
+      <p>Upload an optical or thermal image and run the full pipeline in seconds.</p>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <a href="process.html" class="btn btn-solid">Run Pipeline →</a>
+      <a href="history.html" class="btn btn-ghost">Run History</a>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <span>ThermalSR · Multi Image Processing System</span>
+  <span id="backend-label">Backend: Python · OpenCV · scikit-image</span>
+</footer>
+
+</body>
+</html>

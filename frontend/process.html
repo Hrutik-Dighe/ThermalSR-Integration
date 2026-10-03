@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Process — ThermalSR · Multi Image Processing System</title>
+<link rel="stylesheet" href="css/global.css"/>
+<style>
+.page-wrap { max-width: 1400px; margin: 0 auto; padding: 48px 40px 100px; position: relative; z-index: 1; }
+
+/* ─ LAYOUT ─ */
+.two-col { display: grid; grid-template-columns: 320px 1fr; gap: 28px; align-items: start; }
+
+/* ─ SIDEBAR ─ */
+.sidebar { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 80px; }
+
+.panel {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); overflow: hidden;
+}
+.panel-head {
+  padding: 11px 16px; border-bottom: 1px solid var(--border2);
+  font-family: var(--ff-mono); font-size: 9px; font-weight: 700;
+  color: var(--muted); letter-spacing: 2px; text-transform: uppercase;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.dots { display: flex; gap: 5px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.panel-body { padding: 18px; }
+
+/* ─ UPLOAD ZONE ─ */
+.upload-zone {
+  border: 1.5px dashed var(--dim); border-radius: 8px;
+  padding: 32px 16px; text-align: center; cursor: pointer;
+  transition: all 0.3s; background: var(--bg1);
+}
+.upload-zone:hover, .upload-zone.drag {
+  border-color: var(--accent);
+  background: rgba(0,200,240,0.03);
+  box-shadow: inset 0 0 30px rgba(0,200,240,0.06);
+}
+.upload-zone h3 { font-family: var(--ff-head); font-size: 13px; color: var(--text); margin-bottom: 5px; }
+.upload-zone p  { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); margin-bottom: 14px; }
+#file-input { display: none; }
+
+.thumb-wrap { display: none; margin-top: 14px; }
+.thumb-wrap img { width: 100%; border-radius: 6px; border: 1px solid var(--border2); aspect-ratio: 4/3; object-fit: cover; }
+.thumb-name { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); margin-top: 6px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+
+/* ─ SLIDERS ─ */
+.slider-row { margin-bottom: 14px; }
+.slider-label { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 5px; }
+.slider-label b { color: var(--accent); font-weight: 400; }
+input[type=range] {
+  width: 100%; height: 3px; -webkit-appearance: none; appearance: none;
+  background: var(--dim); border-radius: 2px; outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px;
+  border-radius: 50%; background: var(--accent); cursor: pointer;
+  border: 2px solid var(--bg); box-shadow: 0 0 6px rgba(0,200,240,0.4);
+}
+
+/* ─ SAMPLE STRIP ─ */
+.samples-section {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.samples-label { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); letter-spacing: 2px; }
+.samples-scroll {
+  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
+  scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+}
+.samples-scroll::-webkit-scrollbar { height: 4px; }
+.samples-scroll::-webkit-scrollbar-track { background: transparent; }
+.samples-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.sample-thumb {
+  flex-shrink: 0; width: 64px; height: 48px;
+  border: 1.5px solid var(--border2); border-radius: 6px;
+  object-fit: cover; cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.sample-thumb:hover { border-color: var(--accent); transform: scale(1.05); }
+.sample-thumb.selected { border-color: var(--accent); box-shadow: 0 0 8px rgba(0,200,240,0.4); }
+
+/* ─ RUN BUTTON ─ */
+.run-btn {
+  width: 100%; padding: 14px; border-radius: 8px; cursor: pointer;
+  font-family: var(--ff-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 2px; border: 1px solid var(--accent);
+  background: linear-gradient(135deg, rgba(0,200,240,0.18), rgba(0,200,240,0.04));
+  color: var(--accent); transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.run-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(0,200,240,0.3), rgba(0,200,240,0.1));
+  box-shadow: 0 0 22px rgba(0,200,240,0.25); transform: translateY(-1px);
+}
+.run-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ─ SAVE FOLDER BADGE ─ */
+.save-badge {
+  padding: 10px 14px;
+  background: rgba(118,255,3,0.06); border: 1px solid rgba(118,255,3,0.2);
+  border-radius: 8px; display: none; align-items: center; gap: 10px;
+}
+.save-badge-icon { font-size: 16px; }
+.save-badge-text { font-family: var(--ff-mono); font-size: 9px; color: var(--accent3); line-height: 1.6; word-break: break-all; }
+
+/* ─ STEP PROGRESS ─ */
+.prog-panel { display: none; }
+.prog-list  { display: flex; flex-direction: column; }
+.prog-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px; border-bottom: 1px solid var(--border2);
+  font-family: var(--ff-mono); font-size: 9px;
+  transition: background 0.2s;
+}
+.prog-row:last-child { border-bottom: none; }
+.prog-row.done    { background: rgba(0,200,240,0.04); color: var(--accent); }
+.prog-row.running { background: rgba(255,87,34,0.05); color: var(--accent2); }
+.prog-row.waiting { color: var(--dim); }
+.prog-icon {
+  width: 22px; height: 22px; border-radius: 50%; border: 1px solid currentColor;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; flex-shrink: 0;
+}
+.prog-row.running .prog-icon { animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ─ MAIN RESULTS ─ */
+.results-area { flex: 1; }
+
+/* ─ 12-PANEL GRID — matches MATLAB 4×3 layout ─ */
+.panels-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+}
+
+.out-card {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); overflow: hidden;
+  animation: fadeUp 0.45s ease both;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.out-card:hover { border-color: rgba(0,200,240,0.3); box-shadow: 0 6px 28px rgba(0,0,0,0.45); }
+.out-card.sr { border-color: rgba(255,87,34,0.4); }
+.out-card.sr:hover { box-shadow: 0 0 22px rgba(255,87,34,0.18); }
+
+.out-head {
+  padding: 9px 12px; border-bottom: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.out-label { font-family: var(--ff-head); font-size: 11px; font-weight: 700; color: var(--text); }
+.out-tag   { font-family: var(--ff-mono); font-size: 8px; color: var(--muted); }
+
+.out-img {
+  width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
+  background: var(--bg1); transition: transform 0.35s;
+}
+.out-card:hover .out-img { transform: scale(1.03); }
+.out-img-wrap { overflow: hidden; }
+
+/* ─ COMPARE ─ */
+.compare-wrap {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); overflow: hidden; display: none;
+  margin-top: 14px;
+}
+.compare-inner { position: relative; aspect-ratio: 16/5; overflow: hidden; cursor: col-resize; user-select: none; }
+.cmp-base, .cmp-over { position: absolute; inset: 0; }
+.cmp-base img, .cmp-over img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmp-over { clip-path: inset(0 50% 0 0); }
+.cmp-div {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: rgba(255,255,255,0.9); left: 50%; transform: translateX(-50%);
+  pointer-events: none;
+}
+.cmp-handle {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 28px; height: 28px; background: #fff; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5); pointer-events: none;
+}
+.cmp-labels {
+  padding: 8px 14px; display: flex; justify-content: space-between;
+  border-top: 1px solid var(--border2);
+  font-family: var(--ff-mono); font-size: 9px; color: var(--muted);
+}
+
+/* ─ METRICS ROW ─ */
+.metrics-row {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  display: none; margin-top: 14px;
+}
+.met {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); padding: 20px; position: relative; overflow: hidden;
+  animation: fadeUp 0.5s ease both;
+}
+.met::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; }
+.met.p::after { background: linear-gradient(90deg, var(--accent),  transparent); }
+.met.s::after { background: linear-gradient(90deg, var(--accent2), transparent); }
+.met.r::after { background: linear-gradient(90deg, var(--accent3), transparent); }
+.met-lbl { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); letter-spacing: 2px; margin-bottom: 6px; }
+.met-val { font-family: var(--ff-head); font-size: 32px; font-weight: 800; line-height: 1; margin-bottom: 3px; }
+.met.p .met-val { color: var(--accent); }
+.met.s .met-val { color: var(--accent2); }
+.met.r .met-val { color: var(--accent3); }
+.met-unit { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); }
+.met-bar-wrap { height: 3px; background: var(--dim); border-radius: 2px; overflow: hidden; margin-top: 12px; }
+.met-bar { height: 100%; border-radius: 2px; width: 0%; transition: width 1.2s cubic-bezier(.16,1,.3,1); }
+.met.p .met-bar { background: var(--accent); }
+.met.s .met-bar { background: var(--accent2); }
+.met.r .met-bar { background: var(--accent3); }
+.met-badge { font-family: var(--ff-mono); font-size: 9px; margin-top: 8px; display: inline-block; padding: 3px 8px; border-radius: 3px; }
+.good { background: rgba(118,255,3,0.1);  border: 1px solid rgba(118,255,3,0.25);  color: var(--accent3); }
+.avg  { background: rgba(0,200,240,0.1);  border: 1px solid rgba(0,200,240,0.25);  color: var(--accent); }
+.poor { background: rgba(255,87,34,0.1);  border: 1px solid rgba(255,87,34,0.25);  color: var(--accent2); }
+
+/* ─ EMPTY ─ */
+.empty {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); padding: 80px 40px; text-align: center;
+}
+.empty-glyph { font-size: 52px; opacity: 0.2; margin-bottom: 16px; }
+.empty h3 { font-family: var(--ff-head); font-size: 20px; color: var(--dim); margin-bottom: 8px; }
+.empty p  { font-family: var(--ff-mono); font-size: 11px; color: var(--muted); }
+
+/* ─ PROCESSING OVERLAY ─ */
+.proc-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(3,8,13,0.88); backdrop-filter: blur(10px);
+  align-items: center; justify-content: center; flex-direction: column; gap: 20px;
+}
+.proc-overlay.show { display: flex; }
+.proc-ring {
+  width: 64px; height: 64px; border-radius: 50%;
+  border: 2px solid var(--dim); border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.proc-text { font-family: var(--ff-head); font-size: 13px; color: var(--accent); letter-spacing: 3px; }
+.proc-sub  { font-family: var(--ff-mono); font-size: 10px; color: var(--muted); }
+
+@media (max-width: 1100px) {
+  .two-col { grid-template-columns: 1fr; }
+  .sidebar { position: static; }
+  .panels-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 700px) {
+  .panels-grid { grid-template-columns: repeat(2, 1fr); }
+  .metrics-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+
+<!-- PROCESSING OVERLAY -->
+<div class="proc-overlay" id="proc-overlay">
+  <div class="proc-ring"></div>
+  <div class="proc-text">PROCESSING IMAGE</div>
+  <div class="proc-sub" id="proc-sub">Initialising pipeline...</div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a href="index.html" class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="6" stroke="#00c8f0" stroke-width="1.2"/>
+        <circle cx="8" cy="8" r="2.5" fill="#00c8f0" opacity="0.7"/>
+      </svg>
+    </div>
+    <div class="nav-logo-text">THERMALSR</div>
+  </a>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="process.html" class="active">Process</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="history.html">History</a>
+  </div>
+  <span class="nav-badge">MULTI IMAGE PROCESSING SYSTEM</span>
+</nav>
+
+<div class="page-wrap">
+  <div style="margin-bottom:32px;">
+    <span class="sec-label">Multi Image Processing System</span>
+    <h1 style="font-family:var(--ff-head);font-size:38px;font-weight:800;color:#fff;">
+      Run <span style="color:var(--accent)">Pipeline</span>
+    </h1>
+    <p style="color:var(--muted);font-size:13px;margin-top:8px;">
+      Produces 12 output panels matching MATLAB: Original · Preprocessed · Low-Res · Super-Res · Canny · Sobel · Prewitt · Histogram EQ · Threshold · Morphology · FFT · Heatmap
+    </p>
+  </div>
+
+  <div class="two-col">
+
+    <!-- ── SIDEBAR ── -->
+    <div class="sidebar">
+
+      <!-- Upload -->
+      <div class="panel">
+        <div class="panel-head">
+          Image Input
+          <div class="dots"><div class="dot" style="background:#ff5f57"></div><div class="dot" style="background:#ffbd2e"></div><div class="dot" style="background:#28ca41"></div></div>
+        </div>
+        <div class="panel-body">
+          <!-- Sample images -->
+          <div class="samples-section" id="samples-section" style="display:none;margin-bottom:14px;">
+            <div class="samples-label">SAMPLE IMAGES — CLICK TO USE</div>
+            <div class="samples-scroll" id="samples-scroll"></div>
+          </div>
+          <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+            <div style="font-size:28px;margin-bottom:12px;opacity:0.4;">🌡️</div>
+            <h3>Drop image here</h3>
+            <p>JPG · PNG · TIFF · BMP · Optical / Thermal</p>
+            <span class="tag tag-cyan" style="cursor:pointer;">Select File</span>
+          </div>
+          <input type="file" id="file-input" accept="image/*"/>
+          <div class="thumb-wrap" id="thumb-wrap">
+            <img id="thumb-img" src="" alt=""/>
+            <div class="thumb-name" id="thumb-name"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="panel">
+        <div class="panel-head">Pipeline Settings</div>
+        <div class="panel-body">
+          <div class="slider-row">
+            <div class="slider-label"><span>Edge Weight</span><b id="v-ew">0.60</b></div>
+            <input type="range" id="edge-weight" min="0" max="1" step="0.05" value="0.60"
+              oninput="document.getElementById('v-ew').textContent=parseFloat(this.value).toFixed(2)"/>
+          </div>
+          <div class="slider-row">
+            <div class="slider-label"><span>Detail Weight</span><b id="v-dw">0.40</b></div>
+            <input type="range" id="detail-weight" min="0" max="1" step="0.05" value="0.40"
+              oninput="document.getElementById('v-dw').textContent=parseFloat(this.value).toFixed(2)"/>
+          </div>
+          <div class="slider-row">
+            <div class="slider-label"><span>Sharpening Amount</span><b id="v-sh">1.80</b></div>
+            <input type="range" id="sharpen-amount" min="0.5" max="3" step="0.1" value="1.8"
+              oninput="document.getElementById('v-sh').textContent=parseFloat(this.value).toFixed(2)"/>
+          </div>
+          <div class="slider-row">
+            <div class="slider-label"><span>LR Scale Factor</span><b id="v-sc">0.40</b></div>
+            <input type="range" id="lr-scale" min="0.2" max="0.7" step="0.05" value="0.4"
+              oninput="document.getElementById('v-sc').textContent=parseFloat(this.value).toFixed(2)"/>
+          </div>
+          <div style="height:1px;background:var(--border2);margin:10px 0;"></div>
+          <div class="slider-row">
+            <div class="slider-label"><span>Median Filter Size</span><b id="v-mf">5</b></div>
+            <input type="range" id="median-size" min="1" max="11" step="2" value="5"
+              oninput="document.getElementById('v-mf').textContent=this.value"/>
+          </div>
+          <div class="slider-row" style="margin-bottom:0">
+            <div class="slider-label"><span>CLAHE Clip Limit</span><b id="v-cl">0.02</b></div>
+            <input type="range" id="clahe-clip" min="0.01" max="0.10" step="0.01" value="0.02"
+              oninput="document.getElementById('v-cl').textContent=parseFloat(this.value).toFixed(2)"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Run -->
+      <button class="run-btn" id="run-btn" onclick="runPipeline()" disabled>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        RUN PIPELINE
+      </button>
+
+
+
+      <!-- Step progress -->
+      <div class="panel prog-panel" id="prog-panel">
+        <div class="panel-head">Pipeline Steps</div>
+        <div class="prog-list" id="prog-list"></div>
+      </div>
+
+    </div>
+
+    <!-- ── RESULTS ── -->
+    <div class="results-area">
+
+      <!-- Empty state -->
+      <div class="empty" id="empty">
+        <div class="empty-glyph">📡</div>
+        <h3>No image processed yet</h3>
+        <p>Upload an image and click Run Pipeline<br/>All 12 outputs will appear here</p>
+      </div>
+
+      <!-- 12-panel grid -->
+      <div class="panels-grid" id="panels-grid" style="display:none;">
+        <!-- Injected by JS -->
+      </div>
+
+      <!-- Metrics -->
+      <div class="metrics-row" id="metrics-row" style="display:none;">
+        <div class="met p">
+          <div class="met-lbl">PSNR</div>
+          <div class="met-val" id="m-psnr">—</div>
+          <div class="met-unit">dB · Peak Signal-to-Noise Ratio</div>
+          <div class="met-bar-wrap"><div class="met-bar" id="b-psnr"></div></div>
+          <div id="r-psnr"></div>
+        </div>
+        <div class="met s">
+          <div class="met-lbl">SSIM</div>
+          <div class="met-val" id="m-ssim">—</div>
+          <div class="met-unit">Structural Similarity (0–1)</div>
+          <div class="met-bar-wrap"><div class="met-bar" id="b-ssim"></div></div>
+          <div id="r-ssim"></div>
+        </div>
+        <div class="met r">
+          <div class="met-lbl">RMSE</div>
+          <div class="met-val" id="m-rmse">—</div>
+          <div class="met-unit">Root Mean Square Error</div>
+          <div class="met-bar-wrap"><div class="met-bar" id="b-rmse"></div></div>
+          <div id="r-rmse"></div>
+        </div>
+      </div>
+
+      <!-- Compare slider -->
+      <div class="compare-wrap" id="compare-wrap">
+        <div class="panel-head" style="padding:11px 16px;">Before / After Comparison</div>
+        <div class="compare-inner" id="cmp-inner">
+          <div class="cmp-base"><img id="cmp-lr"  src="" alt=""/></div>
+          <div class="cmp-over" id="cmp-over"><img id="cmp-sr" src="" alt=""/></div>
+          <div class="cmp-div" id="cmp-div">
+            <div class="cmp-handle">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2.5">
+                <polyline points="9 18 3 12 9 6"/><polyline points="15 18 21 12 15 6"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="cmp-labels">
+          <span>◀ LOW RESOLUTION</span>
+          <span>SUPER RESOLUTION ▶</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>ThermalSR · Multi Image Processing System</span>
+  <span id="backend-label">Backend: Python · OpenCV · scikit-image</span>
+</footer>
+
+<!-- Image Fullscreen Modal -->
+<div id="img-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(3,8,13,0.95);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
+  <img id="modal-img" src="" style="max-width:95%;max-height:95%;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,0.8);object-fit:contain;">
+</div>
+
+<script>
+const API = window.location.origin;
+let currentFile = null;
+
+document.getElementById('img-modal').addEventListener('click', function() {
+  this.style.display = 'none';
+});
+
+// ── LOAD SAMPLE IMAGES ──
+async function loadSamples() {
+  try {
+    const res = await fetch(`${API}/samples`);
+    if (!res.ok) return;
+    const { samples } = await res.json();
+    if (!samples || samples.length === 0) return;
+
+    const scroll = document.getElementById('samples-scroll');
+    const section = document.getElementById('samples-section');
+    section.style.display = 'flex';
+
+    samples.forEach(name => {
+      const img = document.createElement('img');
+      img.className = 'sample-thumb';
+      img.src = `${API}/samples-img/${name}`;
+      img.alt = name;
+      img.title = name;
+      img.addEventListener('click', async () => {
+        // Deselect all, select this
+        document.querySelectorAll('.sample-thumb').forEach(t => t.classList.remove('selected'));
+        img.classList.add('selected');
+
+        // Fetch the image and convert to a File object
+        const blob = await fetch(img.src).then(r => r.blob());
+        const file = new File([blob], name, { type: blob.type || 'image/jpeg' });
+        loadFile(file);
+      });
+      scroll.appendChild(img);
+    });
+  } catch (e) {
+    // Silently ignore — samples panel stays hidden if server unavailable
+  }
+}
+document.addEventListener('DOMContentLoaded', loadSamples);
+
+
+const PANELS = [
+  { key: 'original',     label: 'Original',         tag: 'INPUT',   cls: '',   row: 1, file: '01_original.png' },
+  { key: 'preprocessed', label: 'Preprocessed',      tag: 'STEP 01', cls: '',   row: 1, file: '02_preprocessed.png' },
+  { key: 'low_res',      label: 'Low Resolution',    tag: 'STEP 03', cls: '',   row: 1, file: '03_low_resolution.png' },
+  { key: 'super_res',    label: 'Super Resolution',  tag: 'STEP 04', cls: 'sr', row: 1, file: '04_super_resolution.png' },
+  { key: 'canny',        label: 'Canny Edge',        tag: 'STEP 05', cls: '',   row: 2, file: '05_canny_edge.png' },
+  { key: 'sobel',        label: 'Sobel Edge',        tag: 'STEP 06', cls: '',   row: 2, file: '06_sobel_edge.png' },
+  { key: 'prewitt',      label: 'Prewitt Edge',      tag: 'STEP 07', cls: '',   row: 2, file: '07_prewitt_edge.png' },
+  { key: 'hist_eq',      label: 'Histogram EQ',      tag: 'STEP 08', cls: '',   row: 2, file: '08_histogram_eq.png' },
+  { key: 'threshold',    label: 'Threshold',         tag: 'STEP 09', cls: '',   row: 3, file: '09_threshold.png' },
+  { key: 'morphology',   label: 'Morphology',        tag: 'STEP 10', cls: '',   row: 3, file: '10_morphology.png' },
+  { key: 'fft',          label: 'FFT',               tag: 'STEP 11', cls: '',   row: 3, file: '11_fft.png' },
+  { key: 'heatmap',      label: 'Heatmap',           tag: 'STEP 12', cls: '',   row: 3, file: '12_heatmap.png' },
+];
+
+const STEPS = [
+  'Grayscale + Median filter',
+  'CLAHE contrast enhancement',
+  'Low-resolution simulation',
+  'Multi-scale detail extraction',
+  'Canny edge detection',
+  'Sobel edge detection',
+  'Prewitt edge detection',
+  'Histogram equalization',
+  'Otsu threshold',
+  'Morphological open/close',
+  'FFT spectrum analysis',
+  'SR fusion + sharpening + metrics',
+];
+
+// ── FILE UPLOAD ──
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+function loadFile(f) {
+  currentFile = f;
+  const url = URL.createObjectURL(f);
+  document.getElementById('thumb-img').src = url;
+  document.getElementById('thumb-name').textContent = f.name + ' · ' + (f.size/1024).toFixed(1) + ' KB';
+  document.getElementById('thumb-wrap').style.display = 'block';
+  document.getElementById('run-btn').disabled = false;
+}
+
+// ── PIPELINE ──
+async function runPipeline() {
+  if (!currentFile) return;
+
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('proc-overlay').classList.add('show');
+  document.getElementById('empty').style.display = 'none';
+  document.getElementById('panels-grid').style.display = 'none';
+  document.getElementById('metrics-row').style.display = 'none';
+  document.getElementById('compare-wrap').style.display = 'none';
+
+  // Progress panel
+  const pp = document.getElementById('prog-panel');
+  pp.style.display = 'block';
+  animateProgress();
+
+  const fd = new FormData();
+  fd.append('file', currentFile);
+  fd.append('edge_weight',    document.getElementById('edge-weight').value);
+  fd.append('detail_weight',  document.getElementById('detail-weight').value);
+  fd.append('sharpen_amount', document.getElementById('sharpen-amount').value);
+  fd.append('lr_scale',       document.getElementById('lr-scale').value);
+  fd.append('median_size',    document.getElementById('median-size').value);
+  fd.append('clahe_clip',     document.getElementById('clahe-clip').value);
+
+  let data;
+  try {
+    const r = await fetch(`${API}/process`, { method: 'POST', body: fd });
+    if (!r.ok) {
+      // Server IS reachable but rejected the request — surface its
+      // error message instead of silently falling back.
+      let msg = 'Server error ' + r.status;
+      try { const j = await r.json(); if (j && j.error) msg = j.error; } catch (e) {}
+      throw Object.assign(new Error(msg), { serverError: true });
+    }
+    data = await r.json();
+    document.getElementById('backend-label').textContent = 'Backend: ' + (data.backend || 'Python/OpenCV');
+  } catch (err) {
+    if (err.serverError) {
+      failPipeline(err.message);
+      return;
+    }
+    // Fetch itself failed (connection refused / offline) — browser fallback
+    console.warn('Backend offline, running browser fallback:', err.message);
+    document.getElementById('proc-sub').textContent = 'Backend offline — running browser fallback...';
+    try {
+      data = await browserFallback(currentFile);
+      document.getElementById('backend-label').textContent = 'Backend: Browser Canvas (offline)';
+    } catch (fb) {
+      failPipeline(fb.message);
+      return;
+    }
+  }
+
+  try {
+    renderResults(data);
+  } catch (e) {
+    failPipeline('Failed to render results: ' + e.message);
+    return;
+  }
+  document.getElementById('proc-overlay').classList.remove('show');
+  document.getElementById('run-btn').disabled = false;
+}
+
+// Show the reason a run failed, then restore the page to a usable state.
+function failPipeline(msg) {
+  console.error('Pipeline failed:', msg);
+  if (stepTimer) { clearInterval(stepTimer); stepTimer = null; }
+  const sub = document.getElementById('proc-sub');
+  sub.textContent = '⚠ ' + msg;
+  sub.style.color = '#ff5470';
+  document.getElementById('panels-grid').style.display = 'none';
+  document.getElementById('empty').style.display = '';
+  setTimeout(() => {
+    document.getElementById('proc-overlay').classList.remove('show');
+    sub.textContent = 'Initialising pipeline...';
+    sub.style.color = '';
+    document.getElementById('run-btn').disabled = false;
+  }, 3000);
+}
+
+let stepTimer = null;
+function animateProgress() {
+  const list = document.getElementById('prog-list');
+  let idx = 0;
+  const render = () => {
+    list.innerHTML = STEPS.map((s, i) => {
+      const cls = i < idx ? 'done' : i === idx ? 'running' : 'waiting';
+      const icon = i < idx ? '✓' : i === idx ? '▶' : String(i+1).padStart(2,'0');
+      return `<div class="prog-row ${cls}"><div class="prog-icon">${icon}</div><span>${s}</span></div>`;
+    }).join('');
+    document.getElementById('proc-sub').textContent = STEPS[Math.min(idx, STEPS.length-1)];
+  };
+  render();
+  if (stepTimer) clearInterval(stepTimer);
+  stepTimer = setInterval(() => { if (idx < STEPS.length - 1) { idx++; render(); } }, 500);
+}
+
+// ── RENDER 12 PANELS ──
+function renderResults(data) {
+  if (stepTimer) clearInterval(stepTimer);
+
+  // Show all 12 panels
+  const grid = document.getElementById('panels-grid');
+  grid.innerHTML = PANELS.map((p, i) => `
+    <div class="out-card ${p.cls}" style="animation-delay:${i * 0.055}s">
+      <div class="out-head">
+        <span class="out-label">${p.label}</span>
+        <span class="out-tag">${p.tag}</span>
+      </div>
+      <div class="out-img-wrap">
+        <img class="out-img" src="${data[p.key]}" alt="${p.label}"/>
+      </div>
+    </div>`).join('');
+  grid.style.display = 'grid';
+
+  // Metrics
+  const m = data.metrics || { psnr: 0, ssim: 0, rmse: 1 };
+  document.getElementById('m-psnr').textContent = m.psnr;
+  document.getElementById('m-ssim').textContent = m.ssim;
+  document.getElementById('m-rmse').textContent = m.rmse;
+  const mr = document.getElementById('metrics-row');
+  mr.style.display = 'grid';
+  setTimeout(() => {
+    document.getElementById('b-psnr').style.width = Math.min(100, m.psnr/50*100) + '%';
+    document.getElementById('b-ssim').style.width = m.ssim * 100 + '%';
+    document.getElementById('b-rmse').style.width = Math.max(5, (1 - m.rmse*10)*100) + '%';
+    const badge = (v, g, a) => {
+      const c = v>=g?'good':v>=a?'avg':'poor', l = v>=g?'EXCELLENT':v>=a?'OK':'LOW';
+      return `<span class="met-badge ${c}">${l}</span>`;
+    };
+    document.getElementById('r-psnr').innerHTML = badge(m.psnr,   30, 20);
+    document.getElementById('r-ssim').innerHTML = badge(m.ssim,   0.85, 0.65);
+    document.getElementById('r-rmse').innerHTML = badge(1-m.rmse, 0.9,  0.8);
+  }, 100);
+
+  // Compare slider
+  document.getElementById('cmp-lr').src = data.low_res;
+  document.getElementById('cmp-sr').src = data.super_res;
+  document.getElementById('compare-wrap').style.display = 'block';
+  initSlider();
+
+
+  // Store for dashboard
+  try { sessionStorage.setItem('thermalsr_results', JSON.stringify(data)); } catch(e) {}
+
+  // Add click listeners to grid images for fullscreen
+  document.querySelectorAll('.out-img').forEach(img => {
+    img.style.cursor = 'zoom-in';
+    img.onclick = function() {
+      document.getElementById('modal-img').src = this.src;
+      document.getElementById('img-modal').style.display = 'flex';
+    };
+  });
+
+  // Scroll
+  setTimeout(() => grid.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+}
+
+// ── COMPARE SLIDER ──
+function initSlider() {
+  const inner = document.getElementById('cmp-inner');
+  const over  = document.getElementById('cmp-over');
+  const div   = document.getElementById('cmp-div');
+  let drag = false;
+  const setPos = x => {
+    const r = inner.getBoundingClientRect();
+    const p = Math.max(0, Math.min(100, (x - r.left) / r.width * 100));
+    over.style.clipPath = `inset(0 ${100-p}% 0 0)`;
+    div.style.left = p + '%';
+  };
+  inner.addEventListener('mousedown', e => { drag=true; setPos(e.clientX); });
+  window.addEventListener('mousemove', e => { if(drag) setPos(e.clientX); });
+  window.addEventListener('mouseup', () => drag=false);
+  inner.addEventListener('touchstart', e => setPos(e.touches[0].clientX), {passive:true});
+  inner.addEventListener('touchmove',  e => setPos(e.touches[0].clientX), {passive:true});
+}
+
+// ══════════════════════════════════════════════
+// BROWSER FALLBACK — 12 outputs, no server
+// ══════════════════════════════════════════════
+async function browserFallback(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = () => reject(new Error('The browser cannot render this file — use JPG, PNG or WEBP.'));
+    img.onload = () => {
+      try {
+      const MAX = 800;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const W = Math.round(img.width * scale), H = Math.round(img.height * scale);
+
+      // Helper canvas
+      const mkCanvas = () => { const c = document.createElement('canvas'); c.width=W; c.height=H; return c; };
+      const getCtx   = c => c.getContext('2d');
+
+      // Draw original
+      const orig = mkCanvas(); getCtx(orig).drawImage(img, 0, 0, W, H);
+      const srcData = getCtx(orig).getImageData(0, 0, W, H).data;
+
+      // Grayscale
+      const gray = new Float32Array(W * H);
+      for (let i = 0; i < W*H; i++)
+        gray[i] = (0.299*srcData[i*4] + 0.587*srcData[i*4+1] + 0.114*srcData[i*4+2]) / 255;
+
+      // Median-like (box avg as approx)
+      const gm = medianApprox(gray, W, H);
+      // CLAHE approx (simple hist eq per tile)
+      const gc = histEqSimple(gm);
+
+      // Low res
+      const lw = Math.round(W * 0.4), lh = Math.round(H * 0.4);
+      const lowSmall = dsamp(gc, W, H, lw, lh);
+      const lowUp    = usamp(lowSmall, lw, lh, W, H);
+
+      // Detail
+      const b1 = gblur(lowUp, W, H, 1), b2 = gblur(lowUp, W, H, 2);
+      const detail = new Float32Array(W*H);
+      for (let i=0;i<W*H;i++) detail[i] = (lowUp[i]-b1[i]) + (b1[i]-b2[i]);
+
+      // Edges
+      const canny  = sobelMag(gc, W, H, true);  // binary-ish canny approx
+      const sobelG = sobelMag(gc, W, H, false);  // continuous sobel
+      const prewittG = prewittMag(gc, W, H);
+
+      // SR
+      const edgeW = parseFloat(document.getElementById('edge-weight').value);
+      const detW  = parseFloat(document.getElementById('detail-weight').value);
+      const shA   = parseFloat(document.getElementById('sharpen-amount').value);
+      const mean_gc = gc.reduce((a,b)=>a+b,0)/gc.length;
+      const cannyW = canny.map(v => v * mean_gc * 1.5);
+      const SR = new Float32Array(W*H);
+      for (let i=0;i<W*H;i++) SR[i] = lowUp[i] + edgeW*cannyW[i] + detW*detail[i];
+      norm(SR);
+      const bsr = gblur(SR, W, H, 2);
+      for (let i=0;i<W*H;i++) SR[i] = Math.min(1, Math.max(0, SR[i] + shA*(SR[i]-bsr[i])));
+
+      // Histogram EQ
+      const histEqArr = histEqSimple(gc);
+
+      // Threshold (Otsu approx)
+      const thresh = otsuThresh(gc);
+
+      // Morphology (open on threshold)
+      const morph = morphOpen(thresh, W, H);
+
+      // FFT (simulated via magnitude spectrum look)
+      const fftArr = fftApprox(gc, W, H);
+
+      // Metrics
+      const psnrV = psnrF(gc, SR);
+      const ssimV = ssimF(gc, SR);
+      const rmseV = rmseF(gc, SR);
+
+      resolve({
+        original:     toB64(srcData, W, H, 'rgba'),
+        preprocessed: toB64Jet(gc),
+        low_res:      toB64Jet(lowUp),
+        super_res:    toB64Jet(SR),
+        canny:        toB64Jet(canny),
+        sobel:        toB64Jet(sobelG),
+        prewitt:      toB64Jet(prewittG),
+        hist_eq:      toB64Jet(histEqArr),
+        threshold:    toB64Bwr(thresh),
+        morphology:   toB64Bwr(morph),
+        fft:          toB64Jet(fftArr),
+        heatmap:      toB64Jet(SR),
+        save_folder_name: null,
+        backend: 'Browser Canvas (offline)',
+        metrics: { psnr: psnrV, ssim: ssimV, rmse: rmseV }
+      });
+
+      // helpers inside closure
+      function medianApprox(a, W, H) {
+        const o = new Float32Array(W*H);
+        for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++) {
+          let s=0;
+          for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++)
+            s+=a[Math.max(0,Math.min(H-1,y+dy))*W+Math.max(0,Math.min(W-1,x+dx))];
+          o[y*W+x]=s/25;
+        }
+        return o;
+      }
+      function histEqSimple(a) {
+        const N=a.length, hist=new Int32Array(256);
+        for(let i=0;i<N;i++) hist[Math.max(0, Math.min(255,(a[i]*255)|0))]++;
+        const cdf=new Float32Array(256); cdf[0]=hist[0];
+        for(let i=1;i<256;i++) cdf[i]=cdf[i-1]+hist[i];
+        const mn=cdf.find(v=>v>0)||0, rng=N-mn||1;
+        const o=new Float32Array(N);
+        for(let i=0;i<N;i++) o[i]=(cdf[Math.max(0, Math.min(255,(a[i]*255)|0))]-mn)/rng;
+        return o;
+      }
+      function dsamp(a,W,H,nW,nH){const o=new Float32Array(nW*nH);for(let y=0;y<nH;y++)for(let x=0;x<nW;x++){const sx=Math.round(x*W/nW),sy=Math.round(y*H/nH);o[y*nW+x]=a[Math.min(sy,H-1)*W+Math.min(sx,W-1)];}return o;}
+      function usamp(a,W,H,nW,nH){const o=new Float32Array(nW*nH);for(let y=0;y<nH;y++)for(let x=0;x<nW;x++){const sx=x*W/nW,sy=y*H/nH,x0=Math.floor(sx),y0=Math.floor(sy),x1=Math.min(x0+1,W-1),y1=Math.min(y0+1,H-1),fx=sx-x0,fy=sy-y0;o[y*nW+x]=a[y0*W+x0]*(1-fx)*(1-fy)+a[y0*W+x1]*fx*(1-fy)+a[y1*W+x0]*(1-fx)*fy+a[y1*W+x1]*fx*fy;}return o;}
+      function gblur(a,W,H,sig){const r=Math.ceil(sig*3),sz=2*r+1,k=new Float32Array(sz);let s=0;for(let i=0;i<sz;i++){k[i]=Math.exp(-((i-r)**2)/(2*sig*sig));s+=k[i];}for(let i=0;i<sz;i++)k[i]/=s;const t=new Float32Array(W*H),o=new Float32Array(W*H);for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=0;for(let ki=0;ki<sz;ki++){const xi=Math.max(0,Math.min(W-1,x+ki-r));v+=a[y*W+xi]*k[ki];}t[y*W+x]=v;}for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=0;for(let ki=0;ki<sz;ki++){const yi=Math.max(0,Math.min(H-1,y+ki-r));v+=t[yi*W+x]*k[ki];}o[y*W+x]=v;}return o;}
+      function sobelMag(a,W,H,binary){const o=new Float32Array(W*H);for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const gx=-a[(y-1)*W+(x-1)]+a[(y-1)*W+(x+1)]-2*a[y*W+(x-1)]+2*a[y*W+(x+1)]-a[(y+1)*W+(x-1)]+a[(y+1)*W+(x+1)];const gy=-a[(y-1)*W+(x-1)]-2*a[(y-1)*W+x]-a[(y-1)*W+(x+1)]+a[(y+1)*W+(x-1)]+2*a[(y+1)*W+x]+a[(y+1)*W+(x+1)];const m=Math.min(1,Math.sqrt(gx*gx+gy*gy));o[y*W+x]=binary?(m>0.15?1:0):m;}norm(o);return o;}
+      function prewittMag(a,W,H){const o=new Float32Array(W*H);for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const gx=-a[(y-1)*W+(x-1)]+a[(y-1)*W+(x+1)]-a[y*W+(x-1)]+a[y*W+(x+1)]-a[(y+1)*W+(x-1)]+a[(y+1)*W+(x+1)];const gy=-a[(y-1)*W+(x-1)]-a[(y-1)*W+x]-a[(y-1)*W+(x+1)]+a[(y+1)*W+(x-1)]+a[(y+1)*W+x]+a[(y+1)*W+(x+1)];o[y*W+x]=Math.min(1,Math.sqrt(gx*gx+gy*gy));}norm(o);return o;}
+      function otsuThresh(a){const hist=new Int32Array(256),N=a.length;for(let i=0;i<N;i++)hist[Math.max(0, Math.min(255,(a[i]*255)|0))]++;let best=0,bestV=-1;for(let t=0;t<256;t++){let w0=0,s0=0,w1=0,s1=0;for(let i=0;i<t;i++){w0+=hist[i];s0+=i*hist[i];}for(let i=t;i<256;i++){w1+=hist[i];s1+=i*hist[i];}if(w0&&w1){const m0=s0/w0,m1=s1/w1,v=w0*w1*(m0-m1)**2;if(v>bestV){bestV=v;best=t;}}}const th=best/255,o=new Float32Array(N);for(let i=0;i<N;i++)o[i]=a[i]>th?1:0;return o;}
+      function morphOpen(a,W,H){const t1=new Float32Array(W*H),o=new Float32Array(W*H);for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){let m=1;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)m=Math.min(m,a[(y+dy)*W+(x+dx)]);t1[y*W+x]=m;}for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){let m=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)m=Math.max(m,t1[(y+dy)*W+(x+dx)]);o[y*W+x]=m;}return o;}
+      function fftApprox(a,W,H){const o=new Float32Array(W*H);const cx=W/2,cy=H/2;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const d=Math.sqrt((x-cx)**2+(y-cy)**2)+1;o[y*W+x]=Math.max(0,1-d/Math.min(W,H)*2.5) * 0.9 + Math.random()*0.05;}norm(o);return o;}
+      function norm(a){let mn=Infinity,mx=-Infinity;for(const v of a){if(v<mn)mn=v;if(v>mx)mx=v;}const r=mx-mn||1;for(let i=0;i<a.length;i++)a[i]=(a[i]-mn)/r;}
+      function psnrF(r,t){let m=0;for(let i=0;i<r.length;i++){const d=r[i]-t[i];m+=d*d;}m/=r.length;return m===0?100:+(10*Math.log10(1/m)).toFixed(2);}
+      function rmseF(r,t){let m=0;for(let i=0;i<r.length;i++){const d=r[i]-t[i];m+=d*d;}return +Math.sqrt(m/r.length).toFixed(4);}
+      function ssimF(r,t){const N=r.length,mu1=r.reduce((a,b)=>a+b,0)/N,mu2=t.reduce((a,b)=>a+b,0)/N;let s1=0,s2=0,s12=0;for(let i=0;i<N;i++){s1+=(r[i]-mu1)**2;s2+=(t[i]-mu2)**2;s12+=(r[i]-mu1)*(t[i]-mu2);}s1/=N;s2/=N;s12/=N;const C1=0.01**2,C2=0.03**2;return +((2*mu1*mu2+C1)*(2*s12+C2)/((mu1**2+mu2**2+C1)*(s1+s2+C2))).toFixed(4);}
+
+      function toB64(rgba, W, H, type) {
+        const c=document.createElement('canvas');c.width=W;c.height=H;
+        const ctx=c.getContext('2d'),id=ctx.createImageData(W,H);
+        id.data.set(rgba);ctx.putImageData(id,0,0);return c.toDataURL('image/png');
+      }
+      function jetRGB(t){
+        const r=Math.min(1,Math.max(0,1.5-Math.abs(4*t-3)));
+        const g=Math.min(1,Math.max(0,1.5-Math.abs(4*t-2)));
+        const b=Math.min(1,Math.max(0,1.5-Math.abs(4*t-1)));
+        return [(r*255)|0,(g*255)|0,(b*255)|0];
+      }
+      function bwrRGB(t){
+        if(t<0.5){const v=t*2;return [(v*255)|0,0,(255)|0];}
+        else{const v=(t-0.5)*2;return [(255)|0,0,((1-v)*255)|0];}
+      }
+      function makeB64(arr,colorFn){
+        const c=document.createElement('canvas');c.width=W;c.height=H;
+        const ctx=c.getContext('2d'),id=ctx.createImageData(W,H);
+        for(let i=0;i<arr.length;i++){const[r,g,b]=colorFn(Math.min(1,Math.max(0,arr[i])));id.data[i*4]=r;id.data[i*4+1]=g;id.data[i*4+2]=b;id.data[i*4+3]=255;}
+        ctx.putImageData(id,0,0);return c.toDataURL('image/png');
+      }
+      function toB64Jet(a){return makeB64(a,jetRGB);}
+      function toB64Bwr(a){return makeB64(a,bwrRGB);}
+      } catch (err) { reject(err); }
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>History — ThermalSR</title>
+<link rel="stylesheet" href="css/global.css"/>
+<style>
+.page-wrap { max-width: 1400px; margin: 0 auto; padding: 48px 40px 100px; position: relative; z-index: 1; }
+
+.history-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.history-card {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); overflow: hidden;
+  animation: fadeUp 0.45s ease both;
+  padding: 24px;
+}
+
+.history-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border2);
+  padding-bottom: 16px;
+}
+
+.run-title { font-family: var(--ff-head); font-size: 20px; color: #fff; }
+.run-metrics { font-family: var(--ff-mono); font-size: 11px; color: var(--accent); display:flex; gap: 16px; }
+
+.run-images {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px;
+}
+
+.historic-item {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.historic-label { font-family: var(--ff-mono); font-size: 9px; color: var(--muted); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+.out-img {
+  width: 100%; aspect-ratio: 4/3; object-fit: contain; display: block;
+  background: var(--bg1); cursor: zoom-in;
+  border: 1px solid var(--border2); border-radius: 6px;
+  transition: border-color 0.2s;
+}
+.out-img:hover { border-color: var(--accent); }
+
+/* ─ EMPTY ─ */
+.empty {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--r); padding: 80px 40px; text-align: center;
+}
+.empty-glyph { font-size: 52px; opacity: 0.2; margin-bottom: 16px; }
+.empty h3 { font-family: var(--ff-head); font-size: 20px; color: var(--dim); margin-bottom: 8px; }
+.empty p  { font-family: var(--ff-mono); font-size: 11px; color: var(--muted); }
+
+@media (max-width: 1100px) {
+  .run-images { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 700px) {
+  .run-images { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+
+<!-- NAV -->
+<nav>
+  <a href="index.html" class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="6" stroke="#00c8f0" stroke-width="1.2"/>
+        <circle cx="8" cy="8" r="2.5" fill="#00c8f0" opacity="0.7"/>
+      </svg>
+    </div>
+    <div class="nav-logo-text">THERMALSR</div>
+  </a>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="process.html">Process</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="history.html" class="active">History</a>
+  </div>
+  <span class="nav-badge">MULTI IMAGE PROCESSING SYSTEM</span>
+</nav>
+
+<div class="page-wrap">
+  <div style="margin-bottom:32px;">
+    <span class="sec-label">Run History</span>
+    <h1 style="font-family:var(--ff-head);font-size:38px;font-weight:800;color:#fff;">
+      Saved <span style="color:var(--accent)">Processes</span>
+    </h1>
+    <p style="color:var(--muted);font-size:13px;margin-top:8px;">
+      View all previously processed images and their computed outputs. Click on any image to expand it in full screen.
+    </p>
+  </div>
+
+  <div id="loading" style="font-family:var(--ff-mono); font-size:12px; color:var(--accent);">Fetching run history...</div>
+  
+  <div class="history-grid" id="history-grid"></div>
+
+  <!-- Empty state -->
+  <div class="empty" id="empty" style="display:none;">
+    <div class="empty-glyph">📡</div>
+    <h3>No history found</h3>
+    <p>Run the pipeline first to generate saved images.</p>
+  </div>
+</div>
+
+<footer>
+  <span>ThermalSR · Run History</span>
+  <span id="backend-label">Backend: Python · OpenCV · scikit-image</span>
+</footer>
+
+<!-- Image Fullscreen Modal -->
+<div id="img-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(3,8,13,0.95);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
+  <img id="modal-img" src="" style="max-width:95%;max-height:95%;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,0.8);object-fit:contain;">
+</div>
+
+<script>
+const API = window.location.origin;
+
+document.getElementById('img-modal').addEventListener('click', function() {
+  this.style.display = 'none';
+});
+
+async function loadHistory() {
+  try {
+    const res = await fetch(`${API}/runs`);
+    if (!res.ok) throw new Error('Failed to fetch runs');
+    const data = await res.json();
+    
+    document.getElementById('loading').style.display = 'none';
+    
+    if (!data.runs || data.runs.length === 0) {
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+    
+    const grid = document.getElementById('history-grid');
+    let html = '';
+    
+    // Sort array by newest first
+    const sortedRuns = data.runs.sort((a,b) => b.name.localeCompare(a.name));
+    
+    sortedRuns.forEach((run, i) => {
+      // Format timestamp name "YYYYMMDD_HHMMSS" to readable date
+      const yr = run.name.substring(0,4);
+      const mo = run.name.substring(4,6);
+      const da = run.name.substring(6,8);
+      const hr = run.name.substring(9,11);
+      const mi = run.name.substring(11,13);
+      const se = run.name.substring(13,15);
+      const dateStr = `${yr}-${mo}-${da} ${hr}:${mi}:${se}`;
+      
+      const m = run.metrics || {psnr:'N/A', ssim:'N/A', rmse:'N/A'};
+      
+      const imgs = run.files.map(f => {
+        const title = f.replace(/^[0-9]+_/, '').replace('.png', '').replace(/_/g, ' ').toUpperCase();
+        return `
+          <div class="historic-item">
+            <div class="historic-label">${title}</div>
+            <img class="out-img" src="outputs/${run.name}/${f}" alt="${title}">
+          </div>
+        `;
+      }).join('');
+      
+      html += `
+        <div class="history-card" style="animation-delay:${i * 0.1}s">
+          <div class="history-header">
+            <div class="run-title">Run #${run.name}</div>
+            <div class="run-metrics">
+                <span>DATE: ${dateStr}</span>
+                <span>PSNR: ${m.psnr}</span>
+                <span>SSIM: ${m.ssim}</span>
+                <span>RMSE: ${m.rmse}</span>
+                <a href="${API}/download/${run.name}" target="_blank" style="color:#76ff03;text-decoration:none;">[DOWNLOAD ZIP]</a>
+            </div>
+          </div>
+          <div class="run-images">
+            ${imgs}
+          </div>
+        </div>
+      `;
+    });
+    
+    grid.innerHTML = html;
+    
+    // Add full screen modal events dynamically
+    document.querySelectorAll('.out-img').forEach(img => {
+      img.addEventListener('click', function() {
+        document.getElementById('modal-img').src = this.src;
+        document.getElementById('img-modal').style.display = 'flex';
+      });
+    });
+    
+  } catch (err) {
+    console.error(err);
+    document.getElementById('loading').textContent = 'Error connecting to backend.';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadHistory);
+</script>
+</body>
+</html>
